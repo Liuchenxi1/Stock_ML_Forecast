@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/Stock_ML_Forecast.iml" filepath="$PROJECT_DIR$/.idea/Stock_ML_Forecast.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/stock-ml-forecast.iml" filepath="$PROJECT_DIR$/.idea/stock-ml-forecast.iml" />
     </modules>
   </component>
 </project>

@@ -23,6 +23,27 @@ class HorizonDataset:
     X: pd.DataFrame
     y: pd.Series
 
+@dataclass
+class DatasetSplit:
+    """
+    Chronological train / validation / test split
+    for one forecasting horizon.
+    """
+
+    horizon: int
+    target_column: str
+    features: list[str]
+
+    X_train: pd.DataFrame
+    y_train: pd.Series
+
+    X_val: pd.DataFrame
+    y_val: pd.Series
+
+    X_test: pd.DataFrame
+    y_test: pd.Series
+
+    purge_size: int
 
 def add_forward_return_targets(
     df: pd.DataFrame,
@@ -283,3 +304,265 @@ def prepare_all_horizons(
         )
 
     return datasets
+
+def purged_chronological_split(
+    dataset: HorizonDataset,
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+    purge_size: int | None = None,
+) -> DatasetSplit:
+    """
+    Split one horizon dataset chronologically into:
+
+        train -> validation -> test
+
+    and purge observations near split boundaries whose
+    forward-return targets overlap the next period.
+
+    Parameters
+    ----------
+    dataset:
+        HorizonDataset created by prepare_horizon_dataset().
+
+    train_ratio:
+        Fraction of observations assigned to the initial
+        training region.
+
+    val_ratio:
+        Fraction assigned to the initial validation region.
+
+    purge_size:
+        Number of observations removed from the END of
+        train and validation.
+
+        If None, defaults to the forecast horizon.
+
+        Example:
+            horizon = 252
+            purge_size = 252
+
+    Returns
+    -------
+    DatasetSplit
+    """
+
+    if not 0 < train_ratio < 1:
+        raise ValueError(
+            "train_ratio must be between 0 and 1."
+        )
+
+    if not 0 < val_ratio < 1:
+        raise ValueError(
+            "val_ratio must be between 0 and 1."
+        )
+
+    if train_ratio + val_ratio >= 1:
+        raise ValueError(
+            "train_ratio + val_ratio must be less than 1."
+        )
+
+    # -------------------------------------------------
+    # Make sure everything is chronological
+    # -------------------------------------------------
+
+    X = dataset.X.sort_index()
+    y = dataset.y.loc[X.index]
+
+    n = len(X)
+
+    if n < 3:
+        raise ValueError(
+            "Dataset is too small to split."
+        )
+
+    # -------------------------------------------------
+    # Raw split boundaries
+    # -------------------------------------------------
+
+    train_end = int(
+        n * train_ratio
+    )
+
+    val_end = int(
+        n * (train_ratio + val_ratio)
+    )
+
+    if purge_size is None:
+        purge_size = dataset.horizon
+
+    if purge_size < 0:
+        raise ValueError(
+            "purge_size cannot be negative."
+        )
+
+    # -------------------------------------------------
+    # Purged boundaries
+    #
+    # Raw:
+    #
+    # TRAIN      | VALIDATION | TEST
+    #
+    # Purged:
+    #
+    # TRAIN |gap| VALIDATION |gap| TEST
+    #       H                  H
+    # -------------------------------------------------
+
+    train_purged_end = (
+        train_end - purge_size
+    )
+
+    val_purged_end = (
+        val_end - purge_size
+    )
+
+    if train_purged_end <= 0:
+        raise ValueError(
+            f"Purge size {purge_size} is too large "
+            "for the training split."
+        )
+
+    if val_purged_end <= train_end:
+        raise ValueError(
+            f"Purge size {purge_size} is too large "
+            "for the validation split."
+        )
+
+    # -------------------------------------------------
+    # Create splits
+    # -------------------------------------------------
+
+    X_train = X.iloc[
+        :train_purged_end
+    ].copy()
+
+    y_train = y.iloc[
+        :train_purged_end
+    ].copy()
+
+    # Validation STARTS at the original train boundary.
+    # The rows between train_purged_end and train_end
+    # are intentionally unused.
+    X_val = X.iloc[
+        train_end:val_purged_end
+    ].copy()
+
+    y_val = y.iloc[
+        train_end:val_purged_end
+    ].copy()
+
+    # Test begins at the original validation boundary.
+    X_test = X.iloc[
+        val_end:
+    ].copy()
+
+    y_test = y.iloc[
+        val_end:
+    ].copy()
+
+    # -------------------------------------------------
+    # Safety checks
+    # -------------------------------------------------
+
+    if X_train.empty:
+        raise ValueError(
+            "Training split is empty."
+        )
+
+    if X_val.empty:
+        raise ValueError(
+            "Validation split is empty."
+        )
+
+    if X_test.empty:
+        raise ValueError(
+            "Test split is empty."
+        )
+
+    return DatasetSplit(
+        horizon=dataset.horizon,
+        target_column=dataset.target_column,
+        features=list(X.columns),
+
+        X_train=X_train,
+        y_train=y_train,
+
+        X_val=X_val,
+        y_val=y_val,
+
+        X_test=X_test,
+        y_test=y_test,
+
+        purge_size=purge_size,
+    )
+
+def split_all_horizons(
+    datasets: dict[int, HorizonDataset],
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+) -> dict[int, DatasetSplit]:
+    """
+    Apply purged chronological splitting to every
+    forecasting horizon.
+    """
+
+    splits = {}
+
+    for horizon, dataset in datasets.items():
+
+        split = purged_chronological_split(
+            dataset=dataset,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            purge_size=horizon,
+        )
+
+        splits[horizon] = split
+
+        print("\n" + "=" * 60)
+        print(
+            f"{horizon}-day purged split"
+        )
+
+        print(
+            f"Purge size: {split.purge_size} rows"
+        )
+
+        print(
+            f"Train: {len(split.X_train):,} rows"
+        )
+
+        print(
+            f"Validation: {len(split.X_val):,} rows"
+        )
+
+        print(
+            f"Test: {len(split.X_test):,} rows"
+        )
+
+        print(
+            "\nDates:"
+        )
+
+        print(
+            f"Train: "
+            f"{split.X_train.index.min().date()} "
+            f"-> "
+            f"{split.X_train.index.max().date()}"
+        )
+
+        print(
+            f"Validation: "
+            f"{split.X_val.index.min().date()} "
+            f"-> "
+            f"{split.X_val.index.max().date()}"
+        )
+
+        print(
+            f"Test: "
+            f"{split.X_test.index.min().date()} "
+            f"-> "
+            f"{split.X_test.index.max().date()}"
+        )
+
+    return splits

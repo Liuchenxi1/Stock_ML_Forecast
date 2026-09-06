@@ -408,9 +408,7 @@ def merge_point_in_time(
 
     return merged
 
-# ============================================================
 # Main fundamental merge
-# ============================================================
 
 def add_sec_fundamentals(
     df: pd.DataFrame,
@@ -462,9 +460,7 @@ def add_sec_fundamentals(
         f"CIK: {company['cik']}"
     )
 
-    # --------------------------------------------------------
     # Download Company Facts
-    # --------------------------------------------------------
 
     sec_data = download_company_facts(
         cik=company["cik"],
@@ -481,9 +477,7 @@ def add_sec_fundamentals(
         f"US-GAAP concepts: {len(facts)}"
     )
 
-    # --------------------------------------------------------
     # Core fundamentals
-    # --------------------------------------------------------
 
     for (
         column_name,
@@ -520,9 +514,7 @@ def add_sec_fundamentals(
             f"({len(prepared)} filing observations)"
         )
 
-    # --------------------------------------------------------
     # Debt
-    # --------------------------------------------------------
 
     debt_columns = []
 

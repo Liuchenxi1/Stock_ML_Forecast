@@ -89,10 +89,7 @@ for horizon, data in prepared.items():
     print("\n" + "=" * 60)
     print(f"{horizon}-day models")
 
-
-    # --------------------------------------------------------
     # Naive baselines
-    # --------------------------------------------------------
 
     print("\nNaive baselines")
 
@@ -111,10 +108,7 @@ for horizon, data in prepared.items():
         ),
     )
 
-
-    # --------------------------------------------------------
     # Linear Regression
-    # --------------------------------------------------------
 
     linear = train_linear_model(
         data
@@ -140,10 +134,7 @@ for horizon, data in prepared.items():
         ),
     )
 
-
-    # --------------------------------------------------------
     # Ridge Regression
-    # --------------------------------------------------------
 
     ridge = train_ridge_model(
         data,

@@ -1,10 +1,17 @@
 [project]
 name = "stock-ml-forecast"
 version = "0.1.0"
-description = "Add your description here"
+description = "Stock machine learning forecast project"
 readme = "README.md"
-requires-python = ">=3.14"
-dependencies = []
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "tensorflow>=2.21.0",
+    "numpy",
+    "pandas",
+    "requests",
+    "scikit-learn",
+    "yfinance",
+]
 
 [project.scripts]
 stock-ml-forecast = "stock_ml_forecast:main"

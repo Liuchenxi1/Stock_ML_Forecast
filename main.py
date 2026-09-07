@@ -35,6 +35,16 @@ from stock_ml_forecast.models import (
     evaluate_regression,
 )
 
+from stock_ml_forecast.sequence_data import (
+    build_sequence_split,
+)
+
+from stock_ml_forecast.tensorflow_models import (
+    train_gru_model,
+    evaluate_gru,
+    predict_gru_expected_return,
+)
+
 
 # ============================================================
 # Configuration
@@ -380,3 +390,80 @@ for horizon in (
     )
 
     print("=" * 60)
+
+# ============================================================
+# TensorFlow GRU experiment — 126D only
+# ============================================================
+
+HORIZON = 126
+LOOKBACK = 60
+
+data_126 = prepared[
+    HORIZON
+]
+
+sequence_126 = (
+    build_sequence_split(
+        prepared_split=data_126,
+        lookback=LOOKBACK,
+    )
+)
+
+print(
+    "\n126-day TensorFlow GRU"
+)
+
+print(
+    "Train sequences:",
+    sequence_126.X_train.shape,
+)
+
+print(
+    "Validation sequences:",
+    sequence_126.X_val.shape,
+)
+
+print(
+    "Test sequences:",
+    sequence_126.X_test.shape,
+)
+
+
+gru_126 = train_gru_model(
+    data=sequence_126,
+    epochs=200,
+    batch_size=32,
+)
+
+
+validation_metrics = (
+    evaluate_gru(
+        forecast=gru_126,
+        X=sequence_126.X_val,
+        y_return=sequence_126.y_return_val,
+        y_direction=sequence_126.y_direction_val,
+        index=sequence_126.val_index,
+    )
+)
+
+test_metrics = (
+    evaluate_gru(
+        forecast=gru_126,
+        X=sequence_126.X_test,
+        y_return=sequence_126.y_return_test,
+        y_direction=sequence_126.y_direction_test,
+        index=sequence_126.test_index,
+    )
+)
+
+print(
+    "GRU Validation:",
+    validation_metrics,
+)
+
+print(
+    "GRU Test:",
+    test_metrics,
+)
+
+print("=" * 60)

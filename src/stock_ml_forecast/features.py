@@ -24,10 +24,7 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
 
     df = df.copy()
 
-    # ==================================================
     # 1. MONEY FLOW
-    # ==================================================
-
     # Average trading price during the day
     df["Typical_Price"] = (
         df["Stock_High"]
@@ -80,10 +77,7 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
             .sum()
         )
 
-    # ==================================================
     # 2. MOVING AVERAGES
-    # ==================================================
-
     for window in (20, 50, 200):
         df[f"MA_{window}"] = (
             df["Stock_Adj_Close"]
@@ -109,10 +103,7 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
         df["MA_20"] / df["MA_200"] - 1
     )
 
-    # ==================================================
     # 3. RSI
-    # ==================================================
-
     delta = df["Stock_Adj_Close"].diff()
 
     gain = delta.clip(lower=0)
@@ -127,10 +118,7 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
         100 - (100 / (1 + rs))
     )
 
-    # ==================================================
     # 4. MACD
-    # ==================================================
-
     ema_12 = (
         df["Stock_Adj_Close"]
         .ewm(span=12, adjust=False)
@@ -157,10 +145,7 @@ def add_technical_features(df: pd.DataFrame) -> pd.DataFrame:
         - df["MACD_Signal"]
     )
 
-    # ==================================================
     # 5. VOLATILITY
-    # ==================================================
-
     df["Volatility_20D"] = (
         df["Stock_Return_1D"]
         .rolling(window=20)

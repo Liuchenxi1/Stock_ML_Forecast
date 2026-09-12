@@ -1,5 +1,3 @@
-# src/stock_ml_forecast/market_data.py
-
 from datetime import date
 
 import pandas as pd
@@ -101,10 +99,7 @@ def download_market_data(
     df = pd.DataFrame(index=market.index.copy())
     df.index.name = "Date"
 
-    # -----------------------------
     # Selected stock
-    # -----------------------------
-
     df["Stock_Open"] = _get_ticker_column(
         market, "Open", ticker
     )
@@ -129,10 +124,8 @@ def download_market_data(
         market, "Volume", ticker
     )
 
-    # -----------------------------
-    # Benchmark / macro
-    # -----------------------------
 
+    # Benchmark / macro
     df["Benchmark_Close"] = _get_ticker_column(
         market,
         "Close",
@@ -157,10 +150,7 @@ def download_market_data(
         "^TNX",
     )
 
-    # -----------------------------
     # Basic market changes
-    # -----------------------------
-
     df["Stock_Return_1D"] = (
         df["Stock_Adj_Close"].pct_change()
     )

@@ -12,16 +12,69 @@ from stock_ml_forecast.config import (
 @dataclass
 class HorizonDataset:
     """
-    Container for one forecasting horizon.
+    Dataset for one forecast horizon.
+
+    Targets:
+        y_return:
+            Actual forward return.
+
+        y_direction:
+            1 if forward return > 0
+            0 otherwise.
+
+        y_upside:
+            Positive forward return.
+            NaN when the actual return <= 0.
+
+        y_downside:
+            Negative forward return.
+            NaN when the actual return >= 0.
     """
 
     horizon: int
-    target_column: str
 
     data: pd.DataFrame
 
     X: pd.DataFrame
-    y: pd.Series
+
+    y_return: pd.Series
+    y_direction: pd.Series
+    y_upside: pd.Series
+    y_downside: pd.Series
+
+    features: list[str]
+
+
+@dataclass
+class DatasetSplit:
+    """
+    Purged chronological train / validation / test split.
+    """
+
+    horizon: int
+    features: list[str]
+
+    X_train: pd.DataFrame
+    X_val: pd.DataFrame
+    X_test: pd.DataFrame
+
+    y_return_train: pd.Series
+    y_return_val: pd.Series
+    y_return_test: pd.Series
+
+    y_direction_train: pd.Series
+    y_direction_val: pd.Series
+    y_direction_test: pd.Series
+
+    y_upside_train: pd.Series
+    y_upside_val: pd.Series
+    y_upside_test: pd.Series
+
+    y_downside_train: pd.Series
+    y_downside_val: pd.Series
+    y_downside_test: pd.Series
+
+    purge_size: int
 
 
 def add_forward_return_targets(
@@ -30,7 +83,12 @@ def add_forward_return_targets(
     horizons: tuple[int, ...] = FORECAST_HORIZONS,
 ) -> pd.DataFrame:
     """
-    Create forward-return targets.
+    Create four targets for each horizon:
+
+        Forward_Return_63D
+        Direction_63D
+        Upside_Return_63D
+        Downside_Return_63D
 
     Example:
 
@@ -42,14 +100,44 @@ def add_forward_return_targets(
 
     for horizon in horizons:
 
-        target_column = (
+        return_column = (
             f"Forward_Return_{horizon}D"
         )
 
-        result[target_column] = (
+        direction_column = (
+            f"Direction_{horizon}D"
+        )
+
+        upside_column = (
+            f"Upside_Return_{horizon}D"
+        )
+
+        downside_column = (
+            f"Downside_Return_{horizon}D"
+        )
+
+        forward_return = (
             result[price_column].shift(-horizon)
             / result[price_column]
             - 1
+        )
+
+        result[return_column] = forward_return
+
+        # Keep NaN where the future return is unknown.
+        result[direction_column] = np.where(
+            forward_return.notna(),
+            (forward_return > 0).astype(float),
+            np.nan,
+        )
+
+        # Conditional magnitude targets
+        result[upside_column] = forward_return.where(
+            forward_return > 0
+        )
+
+        result[downside_column] = forward_return.where(
+            forward_return < 0
         )
 
     return result
@@ -59,13 +147,6 @@ def get_available_features(
     df: pd.DataFrame,
     requested_features: list[str] | None = None,
 ) -> list[str]:
-    """
-    Return only features that actually exist
-    in the DataFrame.
-
-    This is useful because some companies may not
-    provide every SEC concept.
-    """
 
     if requested_features is None:
         requested_features = MODEL_FEATURES
@@ -83,7 +164,8 @@ def get_available_features(
     ]
 
     if missing:
-        print("\nMissing features:")
+
+        print("Missing features:")
 
         for feature in missing:
             print(f"  - {feature}")
@@ -98,35 +180,42 @@ def prepare_horizon_dataset(
     min_feature_coverage: float = 0.60,
 ) -> HorizonDataset:
     """
-    Create a clean machine-learning dataset for one
-    forward-return horizon.
-
-    Steps:
-    1. Select the target.
-    2. Keep only rows where target is known.
-    3. Remove features with insufficient coverage.
-    4. Keep X and y aligned.
-
-    Missing feature values are NOT imputed here.
-    Imputation should happen later using training data only.
+    Build one clean dataset for one forecasting horizon.
     """
 
     if features is None:
         features = MODEL_FEATURES
 
-    target_column = (
+    return_column = (
         f"Forward_Return_{horizon}D"
     )
 
-    if target_column not in df.columns:
-        raise ValueError(
-            f"{target_column} does not exist. "
-            "Run add_forward_return_targets() first."
-        )
+    direction_column = (
+        f"Direction_{horizon}D"
+    )
 
-    # -------------------------------------------------
-    # Only use features that exist
-    # -------------------------------------------------
+    upside_column = (
+        f"Upside_Return_{horizon}D"
+    )
+
+    downside_column = (
+        f"Downside_Return_{horizon}D"
+    )
+
+    required_targets = [
+        return_column,
+        direction_column,
+        upside_column,
+        downside_column,
+    ]
+
+    for target in required_targets:
+
+        if target not in df.columns:
+            raise ValueError(
+                f"{target} does not exist. "
+                "Run add_forward_return_targets() first."
+            )
 
     available_features = get_available_features(
         df=df,
@@ -138,29 +227,22 @@ def prepare_horizon_dataset(
             "No model features are available."
         )
 
-    # -------------------------------------------------
-    # Start with features + target
-    # -------------------------------------------------
-
     columns = (
         available_features
-        + [target_column]
+        + required_targets
     )
 
     dataset = df[columns].copy()
 
-    # Replace infinity produced by ratios/calculations
     dataset = dataset.replace(
         [np.inf, -np.inf],
         np.nan,
     )
 
-    # -------------------------------------------------
-    # Remove rows without known future target
-    # -------------------------------------------------
-
+    # Only remove rows where the actual future return
+    # is not known.
     dataset = dataset.dropna(
-        subset=[target_column]
+        subset=[return_column]
     )
 
     if dataset.empty:
@@ -168,10 +250,7 @@ def prepare_horizon_dataset(
             f"No usable rows for horizon {horizon}."
         )
 
-    # -------------------------------------------------
-    # Feature coverage
-    # -------------------------------------------------
-
+    # Feature coverage check
     coverage = (
         dataset[available_features]
         .notna()
@@ -196,8 +275,8 @@ def prepare_horizon_dataset(
     if not removed_features.empty:
 
         print(
-            f"\n{horizon}D features removed "
-            f"for low coverage:"
+            f"{horizon}D features removed "
+            "for low coverage:"
         )
 
         for feature, ratio in removed_features.items():
@@ -209,29 +288,31 @@ def prepare_horizon_dataset(
 
     if not selected_features:
         raise ValueError(
-            f"No features meet "
-            f"{min_feature_coverage:.0%} coverage."
+            "No usable model features remain."
         )
 
-    # -------------------------------------------------
-    # Final dataset
-    # -------------------------------------------------
-
-    dataset = dataset[
+    data = dataset[
         selected_features
-        + [target_column]
+        + required_targets
     ].copy()
-
-    X = dataset[selected_features].copy()
-
-    y = dataset[target_column].copy()
 
     return HorizonDataset(
         horizon=horizon,
-        target_column=target_column,
-        data=dataset,
-        X=X,
-        y=y,
+        data=data,
+        X=data[selected_features].copy(),
+
+        y_return=data[return_column].copy(),
+
+        y_direction=(
+            data[direction_column]
+            .astype(int)
+            .copy()
+        ),
+
+        y_upside=data[upside_column].copy(),
+        y_downside=data[downside_column].copy(),
+
+        features=selected_features,
     )
 
 
@@ -241,21 +322,13 @@ def prepare_all_horizons(
     features: list[str] | None = None,
     min_feature_coverage: float = 0.60,
 ) -> dict[int, HorizonDataset]:
-    """
-    Build one dataset for every forecasting horizon.
-    """
 
     datasets = {}
 
     for horizon in horizons:
 
         print(
-            "\n"
-            + "=" * 60
-        )
-
-        print(
-            f"Preparing {horizon}-day dataset"
+            f"\nPreparing {horizon}-day dataset"
         )
 
         dataset = prepare_horizon_dataset(
@@ -267,6 +340,10 @@ def prepare_all_horizons(
 
         datasets[horizon] = dataset
 
+        positive_rate = (
+            dataset.y_direction.mean()
+        )
+
         print(
             f"Rows: {len(dataset.data):,}"
         )
@@ -276,10 +353,234 @@ def prepare_all_horizons(
         )
 
         print(
-            f"Date range: "
+            f"Positive returns: "
+            f"{positive_rate:.1%}"
+        )
+
+        print(
+            "Date range: "
             f"{dataset.data.index.min().date()} "
-            f"to "
+            "-> "
             f"{dataset.data.index.max().date()}"
         )
 
+        print("=" * 60)
+
     return datasets
+
+
+def purged_chronological_split(
+    dataset: HorizonDataset,
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+    purge_size: int | None = None,
+) -> DatasetSplit:
+
+    if train_ratio <= 0 or val_ratio <= 0:
+        raise ValueError(
+            "Ratios must be positive."
+        )
+
+    if train_ratio + val_ratio >= 1:
+        raise ValueError(
+            "train_ratio + val_ratio must be < 1."
+        )
+
+    X = dataset.X.sort_index()
+
+    n = len(X)
+
+    train_end = int(
+        n * train_ratio
+    )
+
+    val_end = int(
+        n * (train_ratio + val_ratio)
+    )
+
+    if purge_size is None:
+        purge_size = dataset.horizon
+
+    train_purged_end = (
+        train_end - purge_size
+    )
+
+    val_purged_end = (
+        val_end - purge_size
+    )
+
+    if train_purged_end <= 0:
+        raise ValueError(
+            "Purge removes entire training set."
+        )
+
+    if val_purged_end <= train_end:
+        raise ValueError(
+            "Purge removes entire validation set."
+        )
+
+    train_index = X.index[
+        :train_purged_end
+    ]
+
+    val_index = X.index[
+        train_end:val_purged_end
+    ]
+
+    test_index = X.index[
+        val_end:
+    ]
+
+    return DatasetSplit(
+        horizon=dataset.horizon,
+        features=dataset.features,
+
+        X_train=X.loc[train_index].copy(),
+        X_val=X.loc[val_index].copy(),
+        X_test=X.loc[test_index].copy(),
+
+        y_return_train=(
+            dataset.y_return
+            .loc[train_index]
+            .copy()
+        ),
+
+        y_return_val=(
+            dataset.y_return
+            .loc[val_index]
+            .copy()
+        ),
+
+        y_return_test=(
+            dataset.y_return
+            .loc[test_index]
+            .copy()
+        ),
+
+        y_direction_train=(
+            dataset.y_direction
+            .loc[train_index]
+            .copy()
+        ),
+
+        y_direction_val=(
+            dataset.y_direction
+            .loc[val_index]
+            .copy()
+        ),
+
+        y_direction_test=(
+            dataset.y_direction
+            .loc[test_index]
+            .copy()
+        ),
+
+        y_upside_train=(
+            dataset.y_upside
+            .loc[train_index]
+            .copy()
+        ),
+
+        y_upside_val=(
+            dataset.y_upside
+            .loc[val_index]
+            .copy()
+        ),
+
+        y_upside_test=(
+            dataset.y_upside
+            .loc[test_index]
+            .copy()
+        ),
+
+        y_downside_train=(
+            dataset.y_downside
+            .loc[train_index]
+            .copy()
+        ),
+
+        y_downside_val=(
+            dataset.y_downside
+            .loc[val_index]
+            .copy()
+        ),
+
+        y_downside_test=(
+            dataset.y_downside
+            .loc[test_index]
+            .copy()
+        ),
+
+        purge_size=purge_size,
+    )
+
+
+def split_all_horizons(
+    datasets: dict[int, HorizonDataset],
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+) -> dict[int, DatasetSplit]:
+
+    splits = {}
+
+    for horizon, dataset in datasets.items():
+
+        split = purged_chronological_split(
+            dataset=dataset,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            purge_size=horizon,
+        )
+
+        splits[horizon] = split
+
+        print(
+            f"\n{horizon}-day purged split"
+        )
+
+        print(
+            f"Purge size: "
+            f"{split.purge_size} rows"
+        )
+
+        print(
+            f"Train: "
+            f"{len(split.X_train):,} rows"
+        )
+
+        print(
+            f"Validation: "
+            f"{len(split.X_val):,} rows"
+        )
+
+        print(
+            f"Test: "
+            f"{len(split.X_test):,} rows"
+        )
+
+        print("Dates:")
+
+        print(
+            "  Train: "
+            f"{split.X_train.index.min().date()} "
+            "-> "
+            f"{split.X_train.index.max().date()}"
+        )
+
+        print(
+            "  Validation: "
+            f"{split.X_val.index.min().date()} "
+            "-> "
+            f"{split.X_val.index.max().date()}"
+        )
+
+        print(
+            "  Test: "
+            f"{split.X_test.index.min().date()} "
+            "-> "
+            f"{split.X_test.index.max().date()}"
+        )
+
+        print("=" * 60)
+
+    return splits

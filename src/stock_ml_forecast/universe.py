@@ -10,16 +10,21 @@ SP500_URL = (
 def get_sp500_universe() -> pd.DataFrame:
     """
     Download the current S&P 500 constituent list.
-
-    Returns:
-        Symbol
-        Security
-        GICS_Sector
-        GICS_Sub_Industry
     """
 
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 "
+            "(Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/152.0 Safari/537.36"
+        )
+    }
+
     tables = pd.read_html(
-        SP500_URL
+        SP500_URL,
+        storage_options=headers,
     )
 
     df = tables[0].copy()
@@ -29,14 +34,13 @@ def get_sp500_universe() -> pd.DataFrame:
             "Symbol": "Ticker",
             "Security": "Company",
             "GICS Sector": "Sector",
-            "GICS Sub-Industry":
-                "Sub_Industry",
+            "GICS Sub-Industry": "Sub_Industry",
         }
     )
 
-    # Yahoo uses BRK-B instead of BRK.B, etc.
     df["Ticker"] = (
         df["Ticker"]
+        .astype(str)
         .str.replace(
             ".",
             "-",
@@ -44,11 +48,15 @@ def get_sp500_universe() -> pd.DataFrame:
         )
     )
 
-    return df[
-        [
-            "Ticker",
-            "Company",
-            "Sector",
-            "Sub_Industry",
-        ]
+    columns_to_keep = [
+        "Ticker",
+        "Company",
+        "Sector",
+        "Sub_Industry",
+        "CIK",
+        "Founded",
     ]
+
+    return df[
+        columns_to_keep
+    ].copy()

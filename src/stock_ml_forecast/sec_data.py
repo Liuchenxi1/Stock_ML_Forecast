@@ -413,7 +413,8 @@ def merge_point_in_time(
 def add_sec_fundamentals(
     df: pd.DataFrame,
     ticker: str,
-    user_agent: str,
+    ser_agent: str,
+    facts: dict | None = None,
 ) -> pd.DataFrame:
     """
     Download SEC fundamentals and merge them into the

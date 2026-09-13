@@ -1,48 +1,14 @@
-from stock_ml_forecast.market_data import (
-    download_market_data,
+from stock_ml_forecast.universe import (
+    get_sp500_universe,
 )
 
-from stock_ml_forecast.features import (
-    add_technical_features,
+from stock_ml_forecast.panel import (
+    build_sp500_panel,
+    load_sp500_panel,
 )
 
-from stock_ml_forecast.sec_data import (
-    add_sec_fundamentals,
-)
-
-from stock_ml_forecast.dataset import (
-    add_forward_return_targets,
-    prepare_all_horizons,
-    split_all_horizons,
-)
-
-from stock_ml_forecast.preprocessing import (
-    preprocess_split,
-)
-
-from stock_ml_forecast.models import (
-    # New architecture
-    train_direction_magnitude_models,
-    predict_expected_return,
-    evaluate_direction_magnitude,
-    evaluate_conditional_magnitude,
-
-    # Baselines / old models
-    evaluate_naive_zero,
-    evaluate_naive_mean,
-    train_linear_model,
-    train_ridge_model,
-    evaluate_regression,
-)
-
-from stock_ml_forecast.sequence_data import (
-    build_sequence_split,
-)
-
-from stock_ml_forecast.tensorflow_models import (
-    train_gru_model,
-    evaluate_gru,
-    predict_gru_expected_return,
+from stock_ml_forecast.paths import (
+    SP500_PANEL_PATH,
 )
 
 
@@ -50,420 +16,135 @@ from stock_ml_forecast.tensorflow_models import (
 # Configuration
 # ============================================================
 
-TICKER = "AAPL"
-
 SEC_USER_AGENT = (
     "Stock ML Forecast shinnkiryu@gmail.com"
 )
 
+BENCHMARK_TICKER = "SPY"
+
+START_DATE = "2016-01-01"
+
+END_DATE = None
+
+
+# False:
+#     use local caches whenever they exist
+#
+# True:
+#     download everything again
+#
+FORCE_REFRESH = False
+
+
+# During development:
+#
+# Use 5 or 10 companies.
+#
+# When everything works:
+#
+# MAX_COMPANIES = None
+#
+MAX_COMPANIES = 5
+
 
 # ============================================================
-# 1. Download market data
+# S&P 500 universe
 # ============================================================
 
-df = download_market_data(
-    ticker=TICKER,
-    benchmark_ticker="SPY",
+universe = (
+    get_sp500_universe()
 )
 
-
-# ============================================================
-# 2. Add technical features
-# ============================================================
-
-df = add_technical_features(
-    df
+print(
+    f"S&P 500 universe: "
+    f"{len(universe)} companies"
 )
 
-
-# ============================================================
-# 3. Add SEC fundamentals
-# ============================================================
-
-df = add_sec_fundamentals(
-    df=df,
-    ticker=TICKER,
-    user_agent=SEC_USER_AGENT,
+print(
+    universe.head()
 )
 
-
-# ============================================================
-# 4. Add forward-return targets
-# ============================================================
-
-df = add_forward_return_targets(
-    df
-)
+print("=" * 60)
 
 
 # ============================================================
-# 5. Build horizon datasets
+# Processed panel
 # ============================================================
 
-datasets = prepare_all_horizons(
-    df
-)
-
-
-# ============================================================
-# 6. Purged chronological splits
-# ============================================================
-
-splits = split_all_horizons(
-    datasets=datasets,
-    train_ratio=0.70,
-    val_ratio=0.15,
-)
-
-
-# ============================================================
-# 7. Preprocess each horizon
-# ============================================================
-
-prepared = {
-    horizon: preprocess_split(split)
-    for horizon, split in splits.items()
-}
-
-
-# ============================================================
-# 8. Train Direction + Upside + Downside models
-# ============================================================
-
-direction_magnitude_models = {}
-
-
-for horizon, data in prepared.items():
-
-    print(
-        f"\n{horizon}-day "
-        "Direction + Magnitude model"
-    )
-
-    model = (
-        train_direction_magnitude_models(
-            data
-        )
-    )
-
-    direction_magnitude_models[
-        horizon
-    ] = model
-
-    validation_metrics = (
-        evaluate_direction_magnitude(
-            models=model,
-            X=data.X_val,
-            y_return=data.y_return_val,
-            y_direction=data.y_direction_val,
-        )
-    )
-
-    test_metrics = (
-        evaluate_direction_magnitude(
-            models=model,
-            X=data.X_test,
-            y_return=data.y_return_test,
-            y_direction=data.y_direction_test,
-        )
-    )
-
-    print(
-        "Validation:",
-        validation_metrics,
-    )
-
-    print(
-        "Test:",
-        test_metrics,
-    )
-
-    # --------------------------------------------------------
-    # Conditional upside / downside performance
-    # --------------------------------------------------------
-
-    conditional_validation = (
-        evaluate_conditional_magnitude(
-            models=model,
-            X=data.X_val,
-            y_upside=data.y_upside_val,
-            y_downside=data.y_downside_val,
-        )
-    )
-
-    conditional_test = (
-        evaluate_conditional_magnitude(
-            models=model,
-            X=data.X_test,
-            y_upside=data.y_upside_test,
-            y_downside=data.y_downside_test,
-        )
-    )
-
-    print(
-        "Validation magnitude:",
-        conditional_validation,
-    )
-
-    print(
-        "Test magnitude:",
-        conditional_test,
-    )
-
-    print("=" * 60)
-
-
-# ============================================================
-# 9. Dataset sizes
-# ============================================================
-
-for horizon in (
-    63,
-    126,
-    252,
+if (
+    SP500_PANEL_PATH.exists()
+    and not FORCE_REFRESH
 ):
 
-    split = splits[
-        horizon
-    ]
-
     print(
-        f"\n{horizon}D dataset sizes"
+        "Loading existing processed panel"
     )
 
-    print(
-        "Train:",
-        split.X_train.shape,
+    panel = (
+        load_sp500_panel()
     )
 
-    print(
-        "Validation:",
-        split.X_val.shape,
-    )
+else:
 
     print(
-        "Test:",
-        split.X_test.shape,
+        "Building S&P 500 panel"
     )
 
-    print("=" * 60)
+    panel = (
+        build_sp500_panel(
+            universe=universe,
+            user_agent=SEC_USER_AGENT,
+            benchmark_ticker=BENCHMARK_TICKER,
+            start_date=START_DATE,
+            end_date=END_DATE,
+            force_refresh=FORCE_REFRESH,
+            max_companies=MAX_COMPANIES,
+        )
+    )
 
 
 # ============================================================
-# 10. Baseline / Linear / Ridge comparison
+# Inspect result
 # ============================================================
 
-for horizon, data in prepared.items():
-
-    print(
-        f"\n{horizon}-day baseline models"
-    )
-
-    # --------------------------------------------------------
-    # Naive baselines
-    # --------------------------------------------------------
-
-    print(
-        "Zero-return baseline:",
-        evaluate_naive_zero(
-            data.y_return_test,
-        ),
-    )
-
-    print(
-        "Training-mean baseline:",
-        evaluate_naive_mean(
-            data.y_return_train,
-            data.y_return_test,
-        ),
-    )
-
-    # --------------------------------------------------------
-    # Linear Regression
-    # --------------------------------------------------------
-
-    linear = (
-        train_linear_model(
-            data
-        )
-    )
-
-    linear_validation = (
-        evaluate_regression(
-            linear,
-            data.X_val,
-            data.y_return_val,
-        )
-    )
-
-    linear_test = (
-        evaluate_regression(
-            linear,
-            data.X_test,
-            data.y_return_test,
-        )
-    )
-
-    print(
-        "Linear Validation:",
-        linear_validation,
-    )
-
-    print(
-        "Linear Test:",
-        linear_test,
-    )
-
-    # --------------------------------------------------------
-    # Ridge Regression
-    # --------------------------------------------------------
-
-    ridge = (
-        train_ridge_model(
-            data,
-            alpha=1.0,
-        )
-    )
-
-    ridge_validation = (
-        evaluate_regression(
-            ridge,
-            data.X_val,
-            data.y_return_val,
-        )
-    )
-
-    ridge_test = (
-        evaluate_regression(
-            ridge,
-            data.X_test,
-            data.y_return_test,
-        )
-    )
-
-    print(
-        "Ridge Validation:",
-        ridge_validation,
-    )
-
-    print(
-        "Ridge Test:",
-        ridge_test,
-    )
-
-    print("=" * 60)
-
-
-# ============================================================
-# 11. Inspect the latest test forecasts
-# ============================================================
-
-for horizon in (
-    63,
-    126,
-    252,
-):
-
-    model = (
-        direction_magnitude_models[
-            horizon
-        ]
-    )
-
-    data = prepared[
-        horizon
-    ]
-
-    forecasts = (
-        predict_expected_return(
-            models=model,
-            X=data.X_test,
-        )
-    )
-
-    print(
-        f"\n{horizon}D latest forecasts"
-    )
-
-    print(
-        forecasts.tail(10)
-    )
-
-    print("=" * 60)
-
-# ============================================================
-# TensorFlow GRU experiment — 126D only
-# ============================================================
-
-HORIZON = 126
-LOOKBACK = 60
-
-data_126 = prepared[
-    HORIZON
-]
-
-sequence_126 = (
-    build_sequence_split(
-        prepared_split=data_126,
-        lookback=LOOKBACK,
-    )
+print(
+    "\nPanel shape:",
+    panel.shape,
 )
 
 print(
-    "\n126-day TensorFlow GRU"
-)
-
-print(
-    "Train sequences:",
-    sequence_126.X_train.shape,
-)
-
-print(
-    "Validation sequences:",
-    sequence_126.X_val.shape,
-)
-
-print(
-    "Test sequences:",
-    sequence_126.X_test.shape,
-)
-
-
-gru_126 = train_gru_model(
-    data=sequence_126,
-    epochs=200,
-    batch_size=32,
-)
-
-
-validation_metrics = (
-    evaluate_gru(
-        forecast=gru_126,
-        X=sequence_126.X_val,
-        y_return=sequence_126.y_return_val,
-        y_direction=sequence_126.y_direction_val,
-        index=sequence_126.val_index,
+    "Companies:",
+    panel
+    .index
+    .get_level_values(
+        "Ticker"
     )
+    .nunique(),
 )
 
-test_metrics = (
-    evaluate_gru(
-        forecast=gru_126,
-        X=sequence_126.X_test,
-        y_return=sequence_126.y_return_test,
-        y_direction=sequence_126.y_direction_test,
-        index=sequence_126.test_index,
+print(
+    "Date range:",
+    panel
+    .index
+    .get_level_values(
+        "Date"
     )
+    .min(),
+    "->",
+    panel
+    .index
+    .get_level_values(
+        "Date"
+    )
+    .max(),
 )
 
 print(
-    "GRU Validation:",
-    validation_metrics,
+    "\nLatest observations:"
 )
 
 print(
-    "GRU Test:",
-    test_metrics,
+    panel.tail()
 )
 
 print("=" * 60)

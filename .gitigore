@@ -1,3 +1,12 @@
 .venv
 .pyproject.toml
 .python-version
+
+# Ignore downloaded / generated data
+data/raw/*
+data/processed/*
+
+# Keep folder placeholders
+!data/raw/market/.gitkeep
+!data/raw/sec/.gitkeep
+!data/processed/.gitkeep

@@ -2,6 +2,10 @@ import json
 
 import pandas as pd
 
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+
 from stock_ml_forecast.market_data import (
     download_market_data,
 )
@@ -57,10 +61,12 @@ def load_or_download_market_data(
     )
 
     if (
-        path.exists()
-        and not force_refresh
+            not force_refresh
+            and is_cache_fresh(
+        path,
+        max_age_hours=24,
+        )
     ):
-
         print(
             f"{ticker}: market cache"
         )
@@ -170,4 +176,26 @@ def load_or_download_sec_facts(
     return (
         company,
         facts,
+    )
+
+def is_cache_fresh(
+    path: Path,
+    max_age_hours: int,
+) -> bool:
+
+    if not path.exists():
+        return False
+
+    modified_time = datetime.fromtimestamp(
+        path.stat().st_mtime,
+        tz=timezone.utc,
+    )
+
+    age = (
+        datetime.now(timezone.utc)
+        - modified_time
+    )
+
+    return age < timedelta(
+        hours=max_age_hours
     )

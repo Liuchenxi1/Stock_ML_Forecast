@@ -11,10 +11,7 @@ SEC_COMPANY_FACTS_URL = (
     "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 )
 
-
-# ============================================================
 # SEC XBRL concepts
-# ============================================================
 
 FUNDAMENTAL_CONCEPTS = {
     "Total_Assets": [
@@ -70,9 +67,7 @@ DEBT_COMPONENT_CONCEPTS = {
 }
 
 
-# ============================================================
 # SEC HTTP helpers
-# ============================================================
 
 def _make_headers(user_agent: str) -> dict:
     """
@@ -97,9 +92,7 @@ def _make_headers(user_agent: str) -> dict:
     }
 
 
-# ============================================================
 # Ticker -> CIK
-# ============================================================
 
 def lookup_sec_company(
     ticker: str,
@@ -152,10 +145,7 @@ def lookup_sec_company(
 
     return None
 
-
-# ============================================================
 # Download Company Facts
-# ============================================================
 
 def download_company_facts(
     cik: str,
@@ -183,10 +173,7 @@ def download_company_facts(
 
     return response.json()
 
-
-# ============================================================
 # Extract a single SEC concept
-# ============================================================
 
 def get_sec_fact(
     facts: dict,
@@ -256,10 +243,7 @@ def get_sec_fact(
         ["filed", "end"]
     )
 
-
-# ============================================================
 # Try alternative SEC concepts
-# ============================================================
 
 def first_available_fact(
     facts: dict,
@@ -281,10 +265,7 @@ def first_available_fact(
 
     return None, pd.DataFrame()
 
-
-# ============================================================
 # Prepare filing-date table
-# ============================================================
 
 def prepare_fundamental_table(
     table: pd.DataFrame,
@@ -345,10 +326,7 @@ def prepare_fundamental_table(
 
     return result
 
-
-# ============================================================
 # Point-in-time merge
-# ============================================================
 
 def merge_point_in_time(
     market_df: pd.DataFrame,
@@ -413,22 +391,23 @@ def merge_point_in_time(
 def add_sec_fundamentals(
     df: pd.DataFrame,
     ticker: str,
-    ser_agent: str,
+    user_agent: str,
     facts: dict | None = None,
 ) -> pd.DataFrame:
     """
-    Download SEC fundamentals and merge them into the
-    daily market DataFrame.
+    Merge SEC fundamentals into the daily market DataFrame.
 
-    Fundamentals are merged using filing dates so the
-    model cannot use information before it became public.
+    If `facts` is provided, use the cached SEC Company Facts JSON.
+
+    If `facts` is None, download Company Facts from the SEC.
+
+    Fundamentals are merged using filing dates so the model
+    cannot use information before it became public.
     """
 
     result = df.copy()
 
-    # --------------------------------------------------------
     # Find company
-    # --------------------------------------------------------
 
     company = lookup_sec_company(
         ticker=ticker,
@@ -461,12 +440,20 @@ def add_sec_fundamentals(
         f"CIK: {company['cik']}"
     )
 
-    # Download Company Facts
+    # Company Facts
 
-    sec_data = download_company_facts(
-        cik=company["cik"],
-        user_agent=user_agent,
-    )
+    if facts is None:
+
+        sec_data = download_company_facts(
+            cik=company["cik"],
+            user_agent=user_agent,
+        )
+
+    else:
+
+        # `facts` supplied by cache.py is the complete
+        # SEC Company Facts JSON.
+        sec_data = facts
 
     facts = (
         sec_data
@@ -550,8 +537,6 @@ def add_sec_fundamentals(
             f"{column_name}: {concept}"
         )
 
-    # Preferred:
-    # current debt + noncurrent debt
     if debt_columns:
 
         result["Total_Debt"] = (
@@ -564,7 +549,6 @@ def add_sec_fundamentals(
 
     else:
 
-        # Fallback combined debt concept
         concept, table = first_available_fact(
             facts=facts,
             concepts=[

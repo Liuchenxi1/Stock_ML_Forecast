@@ -10,6 +10,7 @@ from stock_ml_forecast.cache import (
 from stock_ml_forecast.features import (
     add_technical_features,
 )
+from stock_ml_forecast.panel_features import add_panel_features
 
 from stock_ml_forecast.sec_data import (
     add_sec_fundamentals,
@@ -35,9 +36,7 @@ def build_company_dataset(
 
     ticker = ticker.upper()
 
-    # ------------------------------------------
     # Market
-    # ------------------------------------------
 
     df = load_or_download_market_data(
         ticker=ticker,
@@ -47,17 +46,13 @@ def build_company_dataset(
         force_refresh=force_refresh,
     )
 
-    # ------------------------------------------
     # Technical features
-    # ------------------------------------------
 
     df = add_technical_features(
         df
     )
 
-    # ------------------------------------------
     # SEC facts
-    # ------------------------------------------
 
     _, facts = (
         load_or_download_sec_facts(
@@ -70,7 +65,7 @@ def build_company_dataset(
     df = add_sec_fundamentals(
         df=df,
         ticker=ticker,
-        ser_agent=user_agent,
+        user_agent=user_agent,
         facts=facts,
     )
 
@@ -205,6 +200,11 @@ def build_sp500_panel(
             "Date",
             "Ticker",
         ]
+    )
+
+    # Add normalized ML / ranking features
+    panel = add_panel_features(
+        panel
     )
 
     panel.to_parquet(

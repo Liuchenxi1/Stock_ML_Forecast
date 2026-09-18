@@ -1,0 +1,6 @@
+.venv
+.pyproject.toml
+.python-version
+
+# Ignore all downloaded/generated data
+data/

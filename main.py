@@ -17,9 +17,27 @@ from stock_ml_forecast.panel_features import (
     print_feature_coverage,
 )
 
+from stock_ml_forecast.panel_targets import (
+    add_252d_targets,
+    print_target_summary
+)
+
+from stock_ml_forecast.panel_dataset import (
+    prepare_panel_training_data,
+    purged_chronological_split,
+    print_split_summary,
+)
+
+from stock_ml_forecast.panel_models import (
+    train_panel_models,
+    evaluate_classifier,
+    evaluate_regressor,
+    evaluate_mean_baseline,
+)
+
 
 SEC_USER_AGENT = (
-    "Stock ML Forecast your_email@example.com"
+    "Stock ML Forecast shinnkiryu@gmail.com"
 )
 
 BENCHMARK_TICKER = "SPY"
@@ -95,6 +113,84 @@ print(
 
 print(
     X.tail()
+)
+
+print("=" * 60)
+
+panel = add_252d_targets(
+    panel
+)
+
+print_target_summary(
+    panel
+)
+
+training_data = (
+    prepare_panel_training_data(
+        panel
+    )
+)
+
+split = (
+    purged_chronological_split(
+        training_data,
+        train_fraction=0.70,
+        validation_fraction=0.15,
+        purge_horizon=252,
+    )
+)
+
+print_split_summary(
+    split
+)
+
+models = train_panel_models(
+    X_train=split.X_train,
+    y_top10_train=split.y_top10_train,
+    y_return_train=split.y_return_train,
+)
+
+
+evaluate_classifier(
+    model=models.classifier,
+    X=split.X_validation,
+    y=split.y_top10_validation,
+    label="Validation",
+)
+
+evaluate_classifier(
+    model=models.classifier,
+    X=split.X_test,
+    y=split.y_top10_test,
+    label="Test",
+)
+
+
+evaluate_mean_baseline(
+    y_train=split.y_return_train,
+    y=split.y_return_validation,
+    label="Validation",
+)
+
+evaluate_regressor(
+    model=models.regressor,
+    X=split.X_validation,
+    y=split.y_return_validation,
+    label="Validation",
+)
+
+
+evaluate_mean_baseline(
+    y_train=split.y_return_train,
+    y=split.y_return_test,
+    label="Test",
+)
+
+evaluate_regressor(
+    model=models.regressor,
+    X=split.X_test,
+    y=split.y_return_test,
+    label="Test",
 )
 
 print("=" * 60)

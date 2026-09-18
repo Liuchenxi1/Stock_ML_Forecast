@@ -6,7 +6,7 @@
 data/raw/*
 data/processed/*
 
-# Keep folder placeholders
-!data/raw/market/.gitkeep
-!data/raw/sec/.gitkeep
-!data/processed/.gitkeep
+# Large generated datasets
+data/processed/sp500_panel.parquet
+data/raw/market/
+data/raw/sec/

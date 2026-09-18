@@ -1,4 +1,4 @@
-# src/stock_ml_forecast/sec_data.py
+## downloaded the SEC jason file following the SPY 500 List
 
 import numpy as np
 import pandas as pd

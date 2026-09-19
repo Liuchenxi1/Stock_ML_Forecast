@@ -244,3 +244,192 @@ def evaluate_mean_baseline(
         )
 
     return metrics
+
+def evaluate_top_decile_ranking(
+    classifier,
+    regressor,
+    X: pd.DataFrame,
+    y_top10: pd.Series,
+    y_return: pd.Series,
+    label: str,
+    top_fraction: float = 0.10,
+) -> dict:
+    """
+    Evaluate the model as a cross-sectional stock ranker.
+
+    For every Date:
+        1. predict P(Top 10%)
+        2. rank stocks
+        3. select highest-scoring 10%
+        4. compare with actual future outcomes
+    """
+
+    result = pd.DataFrame(
+        index=X.index
+    )
+
+    result["Probability_Top10"] = (
+        classifier.predict_proba(X)[:, 1]
+    )
+
+    result["Predicted_Excess_Return"] = (
+        regressor.predict(X)
+    )
+
+    result["Actual_Top10"] = (
+        y_top10.astype(int)
+    )
+
+    result["Actual_Excess_Return"] = (
+        y_return.astype(float)
+    )
+
+    daily_results = []
+
+    for date, group in result.groupby(
+        level="Date"
+    ):
+
+        if len(group) < 10:
+            continue
+
+        number_selected = max(
+            1,
+            int(
+                len(group)
+                * top_fraction
+            ),
+        )
+
+        selected = (
+            group
+            .nlargest(
+                number_selected,
+                "Probability_Top10",
+            )
+        )
+
+        actual_positives = (
+            group["Actual_Top10"]
+            .sum()
+        )
+
+        true_positives = (
+            selected["Actual_Top10"]
+            .sum()
+        )
+
+        precision = (
+            selected[
+                "Actual_Top10"
+            ]
+            .mean()
+        )
+
+        if actual_positives > 0:
+
+            recall = (
+                true_positives
+                / actual_positives
+            )
+
+        else:
+
+            recall = np.nan
+
+        selected_return = (
+            selected[
+                "Actual_Excess_Return"
+            ]
+            .mean()
+        )
+
+        universe_return = (
+            group[
+                "Actual_Excess_Return"
+            ]
+            .mean()
+        )
+
+        daily_results.append(
+            {
+                "Date": date,
+                "Precision_at_10pct":
+                    precision,
+
+                "Recall_at_10pct":
+                    recall,
+
+                "Selected_Excess_Return":
+                    selected_return,
+
+                "Universe_Excess_Return":
+                    universe_return,
+
+                "Return_Lift":
+                    selected_return
+                    - universe_return,
+            }
+        )
+
+    daily = pd.DataFrame(
+        daily_results
+    )
+
+    metrics = {
+        "Precision_at_10pct":
+            daily[
+                "Precision_at_10pct"
+            ].mean(),
+
+        "Recall_at_10pct":
+            daily[
+                "Recall_at_10pct"
+            ].mean(),
+
+        "Selected_Excess_Return":
+            daily[
+                "Selected_Excess_Return"
+            ].mean(),
+
+        "Universe_Excess_Return":
+            daily[
+                "Universe_Excess_Return"
+            ].mean(),
+
+        "Return_Lift":
+            daily[
+                "Return_Lift"
+            ].mean(),
+    }
+
+    print(
+        f"\n{label} ranking:"
+    )
+
+    print(
+        f"{'Precision @ 10%':<30}"
+        f"{metrics['Precision_at_10pct']:.2%}"
+    )
+
+    print(
+        f"{'Recall @ 10%':<30}"
+        f"{metrics['Recall_at_10pct']:.2%}"
+    )
+
+    print(
+        f"{'Selected actual excess return':<30}"
+        f"{metrics['Selected_Excess_Return']:.2%}"
+    )
+
+    print(
+        f"{'Universe actual excess return':<30}"
+        f"{metrics['Universe_Excess_Return']:.2%}"
+    )
+
+    print(
+        f"{'Excess-return lift':<30}"
+        f"{metrics['Return_Lift']:.2%}"
+    )
+
+    return metrics

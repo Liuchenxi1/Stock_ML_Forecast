@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ def _get_monthly_snapshot_dates(
     """
     Select one evaluation date per calendar month.
 
-    We use the first available trading date in each month.
+    Uses the first available trading date in each month.
     """
 
     dates = pd.DatetimeIndex(
@@ -201,24 +201,29 @@ def run_monthly_ranking_backtest(
     label: str,
     top_fraction: float = 0.10,
     min_companies: int = 50,
+    include_momentum_baselines: bool = True,
 ) -> RankingBacktestResult:
     """
-    Compare ML ranking against simple momentum baselines.
+    Compare ML ranking against optional momentum baselines.
 
     Methods
     -------
-    ML_Probability
-        Predicted probability of future Top-10% membership.
+    ML Top-10 Probability
+        Classifier probability of future Top-10% membership.
 
-    Momentum_63D
-        Rank directly by trailing 63-day stock return.
+    63D Momentum
+        Rank by trailing 63-day stock return.
 
-    Relative_Momentum_63D
-        Rank by trailing 63-day excess return vs SPY.
+    63D Relative Momentum
+        Rank by trailing 63-day stock return minus SPY.
+
+    Momentum baselines are optional so this function can also
+    evaluate models that do not contain momentum features,
+    such as a fundamentals-only ablation model.
     """
 
     # ========================================================
-    # Monthly snapshots only
+    # Monthly snapshots
     # ========================================================
 
     monthly_dates = (
@@ -260,7 +265,7 @@ def run_monthly_ranking_backtest(
     )
 
     # ========================================================
-    # Build common evaluation table
+    # Evaluation table
     # ========================================================
 
     evaluation = pd.DataFrame(
@@ -277,22 +282,6 @@ def run_monthly_ranking_backtest(
     )
 
     evaluation[
-        "Momentum_63D"
-    ] = (
-        X_monthly[
-            "Return_63D"
-        ]
-    )
-
-    evaluation[
-        "Relative_Momentum_63D"
-    ] = (
-        X_monthly[
-            "Excess_Return_vs_SPY_63D"
-        ]
-    )
-
-    evaluation[
         "Actual_Top10"
     ] = (
         y_top10_monthly
@@ -306,20 +295,70 @@ def run_monthly_ranking_backtest(
         .astype(float)
     )
 
+    # ========================================================
+    # Ranking methods
+    # ========================================================
+
+    methods = {
+        "ML Top-10 Probability":
+            "ML_Probability",
+    }
+
     # --------------------------------------------------------
-    # Fair comparison:
-    #
-    # Require both momentum baseline features to exist.
-    #
-    # Then ML and momentum are evaluated on the same stocks.
+    # Optional momentum baselines
     # --------------------------------------------------------
+
+    if (
+        include_momentum_baselines
+        and
+        "Return_63D" in X_monthly.columns
+    ):
+
+        evaluation[
+            "Momentum_63D"
+        ] = (
+            X_monthly[
+                "Return_63D"
+            ]
+        )
+
+        methods[
+            "63D Momentum"
+        ] = "Momentum_63D"
+
+    if (
+        include_momentum_baselines
+        and
+        "Excess_Return_vs_SPY_63D"
+        in X_monthly.columns
+    ):
+
+        evaluation[
+            "Relative_Momentum_63D"
+        ] = (
+            X_monthly[
+                "Excess_Return_vs_SPY_63D"
+            ]
+        )
+
+        methods[
+            "63D Relative Momentum"
+        ] = (
+            "Relative_Momentum_63D"
+        )
+
+    # ========================================================
+    # Remove rows with missing required target values
+    #
+    # Do NOT require momentum columns here because some
+    # experiments, such as fundamentals-only ablation,
+    # do not contain them.
+    # ========================================================
 
     evaluation = (
         evaluation
         .dropna(
             subset=[
-                "Momentum_63D",
-                "Relative_Momentum_63D",
                 "Actual_Top10",
                 "Actual_Excess_Return",
             ]
@@ -328,19 +367,8 @@ def run_monthly_ranking_backtest(
     )
 
     # ========================================================
-    # Evaluate all ranking methods
+    # Evaluate methods
     # ========================================================
-
-    methods = {
-        "ML Top-10 Probability":
-            "ML_Probability",
-
-        "63D Momentum":
-            "Momentum_63D",
-
-        "63D Relative Momentum":
-            "Relative_Momentum_63D",
-    }
 
     results = []
 
@@ -359,8 +387,14 @@ def run_monthly_ranking_backtest(
             )
         )
 
-        results.append(
-            result
+        if not result.empty:
+            results.append(
+                result
+            )
+
+    if not results:
+        raise ValueError(
+            "No ranking results were generated."
         )
 
     monthly = pd.concat(
@@ -443,7 +477,7 @@ def print_monthly_backtest(
     label: str,
 ) -> None:
     """
-    Print compact monthly ranking comparison.
+    Print compact ranking comparison.
     """
 
     print(

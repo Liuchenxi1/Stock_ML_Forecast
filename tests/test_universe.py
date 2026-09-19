@@ -1,4 +1,4 @@
-from stock_ml_forecast.universe import get_sp500_universe
+from stock_ml_forecast.data.universe import get_sp500_universe
 
 
 def main():

@@ -1,8 +1,8 @@
-from stock_ml_forecast.universe import (
+from stock_ml_forecast.data.universe import (
     get_sp500_universe,
 )
 
-from stock_ml_forecast.panel import (
+from stock_ml_forecast.data.panel import (
     build_sp500_panel,
     load_sp500_panel,
 )
@@ -11,25 +11,24 @@ from stock_ml_forecast.paths import (
     SP500_PANEL_PATH,
 )
 
-from stock_ml_forecast.panel_features import (
-    add_panel_features,
+from stock_ml_forecast.macro.panel_features import (
     get_model_feature_frame,
     print_feature_coverage,
 )
 
-from stock_ml_forecast.panel_targets import (
+from stock_ml_forecast.modeling.panel_targets import (
     add_252d_targets,
     print_target_summary
 )
 
-from stock_ml_forecast.panel_dataset import (
+from stock_ml_forecast.modeling.panel_dataset import (
     prepare_panel_training_data,
     purged_chronological_split,
     print_split_summary,
 )
 
 
-from stock_ml_forecast.panel_models import (
+from stock_ml_forecast.modeling.panel_models import (
     train_panel_models,
     evaluate_classifier,
     evaluate_regressor,
@@ -37,20 +36,24 @@ from stock_ml_forecast.panel_models import (
     evaluate_top_decile_ranking,
 )
 
-from stock_ml_forecast.panel_backtest import (
+from stock_ml_forecast.evaluation.panel_backtest import (
     run_monthly_ranking_backtest,
     print_monthly_backtest,
 )
 
-from stock_ml_forecast.panel_walk_forward import (
+from stock_ml_forecast.evaluation.panel_walk_forward import (
     run_walk_forward_validation,
     print_walk_forward_summary,
-    print_regime_summary,
 )
 
-from stock_ml_forecast.panel_importance import (
+from stock_ml_forecast.evaluation.panel_importance import (
     calculate_feature_importance,
     print_feature_importance,
+)
+
+from stock_ml_forecast.evaluation.panel_ablation import (
+    run_feature_ablation,
+    print_ablation_summary,
 )
 
 SEC_USER_AGENT = (
@@ -292,16 +295,10 @@ print_feature_importance(
     importance
 )
 
-print_regime_summary(
-    panel,
-    start_date="2021-01-05",
-    end_date="2021-07-06",
-    label="Fold 3",
+ablation = run_feature_ablation(
+    split=split,
 )
 
-print_regime_summary(
-    panel,
-    start_date="2021-07-07",
-    end_date="2022-01-03",
-    label="Fold 4",
+print_ablation_summary(
+    ablation
 )

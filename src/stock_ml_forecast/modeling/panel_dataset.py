@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from stock_ml_forecast.panel_features import (
+from stock_ml_forecast.macro.panel_features import (
     MODEL_FEATURES_252D,
 )
 

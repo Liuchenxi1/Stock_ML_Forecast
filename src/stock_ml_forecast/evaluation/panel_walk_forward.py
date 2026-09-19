@@ -2,15 +2,15 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from stock_ml_forecast.panel_features import (
+from stock_ml_forecast.macro.panel_features import (
     MODEL_FEATURES_252D,
 )
 
-from stock_ml_forecast.panel_models import (
+from stock_ml_forecast.modeling.panel_models import (
     train_panel_models,
 )
 
-from stock_ml_forecast.panel_backtest import (
+from stock_ml_forecast.evaluation.panel_backtest import (
     run_monthly_ranking_backtest,
 )
 

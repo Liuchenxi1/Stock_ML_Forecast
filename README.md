@@ -1,5 +1,4 @@
 # Stock_ML_Forecast
-# Stock ML Forecast
 
 A machine-learning research project for ranking S&P 500 companies by their probability of becoming future outperformers over the next approximately 252 trading days.
 

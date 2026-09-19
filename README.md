@@ -254,12 +254,12 @@ The main limitations are:
 
 The next research steps are:
 
-1. Run walk-forward validation using the MARKET + MACRO feature set only.
-2. Improve SEC fundamental features using true comparable fiscal periods.
-3. Add better fundamental acceleration features such as revenue acceleration, margin expansion, debt growth, and cash-flow growth.
-4. Re-run the ablation test after improving the SEC data.
-5. Later reduce survivorship bias using historical S&P 500 membership.
-6. Build the final current-universe ranking pipeline.
+1. [ ] Run walk-forward validation using the MARKET + MACRO feature set only.
+2. [ ] Improve SEC fundamental features using true comparable fiscal periods.
+3. [ ] Add better fundamental acceleration features such as revenue acceleration, margin expansion, debt growth, and cash-flow growth.
+4. [ ] Re-run the ablation test after improving the SEC data.
+5. [ ] Later reduce survivorship bias using historical S&P 500 membership.
+6. [ ] Build the final current-universe ranking pipeline.
 
 ---
 

@@ -3,7 +3,7 @@ import pandas as pd
 
 
 MODEL_FEATURES_252D = [
-    # Market / relative behavior
+    # Existing market features
     "Stock_Return_1D",
     "Benchmark_Return_1D",
     "Price_to_MA20",
@@ -14,17 +14,30 @@ MODEL_FEATURES_252D = [
     "Volatility_20D",
     "Yield_Curve_10Y_3M",
 
-    # Financial growth
+    # New regime features
+    "SPY_Return_20D",
+    "SPY_Return_63D",
+    "SPY_Volatility_20D",
+
+    "VIX_Change_20D",
+    "VIX_Change_63D",
+
+    "Treasury_3M_Change_20D",
+    "Treasury_3M_Change_63D",
+
+    "Treasury_10Y_Change_20D",
+    "Treasury_10Y_Change_63D",
+
+    "Yield_Curve_Change_20D",
+    "Yield_Curve_Change_63D",
+
+    # Fundamentals
     "Revenue_Growth_YoY",
     "Net_Income_Growth_YoY",
     "FCF_Growth_YoY",
-
-    # Balance-sheet quality
     "Debt_to_Assets",
     "Debt_to_Equity",
     "Cash_to_Debt",
-
-    # Profitability / cash generation
     "ROA",
     "ROE",
     "FCF_Margin",
@@ -330,6 +343,66 @@ def add_panel_features(
         [np.inf, -np.inf],
         np.nan,
     )
+
+    def print_regime_summary(
+            panel: pd.DataFrame,
+            start_date: str,
+            end_date: str,
+            label: str,
+    ) -> None:
+
+        dates = (
+            panel.index
+            .get_level_values("Date")
+        )
+
+        mask = (
+                (dates >= pd.Timestamp(start_date))
+                &
+                (dates <= pd.Timestamp(end_date))
+        )
+
+        period = (
+            panel.loc[mask]
+            .reset_index()
+            .groupby("Date")
+            .first()
+        )
+
+        columns = [
+            "VIX",
+            "VIX_Change_20D",
+            "Treasury_3M",
+            "Treasury_3M_Change_63D",
+            "Treasury_10Y",
+            "Treasury_10Y_Change_63D",
+            "Yield_Curve_10Y_3M",
+            "Yield_Curve_Change_63D",
+            "SPY_Return_63D",
+            "SPY_Volatility_20D",
+        ]
+
+        print(
+            f"\n{label} regime summary:"
+        )
+
+        print(
+            period[
+                columns
+            ]
+            .describe()
+            .loc[
+                [
+                    "mean",
+                    "std",
+                    "min",
+                    "max",
+                ]
+            ]
+            .T
+        )
+
+        print("=" * 60)
 
 def get_model_feature_frame(
     panel: pd.DataFrame,

@@ -28,13 +28,30 @@ from stock_ml_forecast.panel_dataset import (
     print_split_summary,
 )
 
+
 from stock_ml_forecast.panel_models import (
     train_panel_models,
     evaluate_classifier,
     evaluate_regressor,
     evaluate_mean_baseline,
+    evaluate_top_decile_ranking,
 )
 
+from stock_ml_forecast.panel_backtest import (
+    run_monthly_ranking_backtest,
+    print_monthly_backtest,
+)
+
+from stock_ml_forecast.panel_walk_forward import (
+    run_walk_forward_validation,
+    print_walk_forward_summary,
+    print_regime_summary,
+)
+
+from stock_ml_forecast.panel_importance import (
+    calculate_feature_importance,
+    print_feature_importance,
+)
 
 SEC_USER_AGENT = (
     "Stock ML Forecast shinnkiryu@gmail.com"
@@ -194,3 +211,97 @@ evaluate_regressor(
 )
 
 print("=" * 60)
+
+evaluate_top_decile_ranking(
+    classifier=models.classifier,
+    regressor=models.regressor,
+    X=split.X_validation,
+    y_top10=split.y_top10_validation,
+    y_return=split.y_return_validation,
+    label="Validation",
+)
+
+evaluate_top_decile_ranking(
+    classifier=models.classifier,
+    regressor=models.regressor,
+    X=split.X_test,
+    y_top10=split.y_top10_test,
+    y_return=split.y_return_test,
+    label="Test",
+)
+
+# ============================================================
+# Monthly ranking backtest
+# ============================================================
+
+validation_backtest = (
+    run_monthly_ranking_backtest(
+        classifier=models.classifier,
+        X=split.X_validation,
+        y_top10=split.y_top10_validation,
+        y_return=split.y_return_validation,
+        label="Validation",
+    )
+)
+
+print_monthly_backtest(
+    validation_backtest,
+    label="Validation",
+)
+
+
+test_backtest = (
+    run_monthly_ranking_backtest(
+        classifier=models.classifier,
+        X=split.X_test,
+        y_top10=split.y_top10_test,
+        y_return=split.y_return_test,
+        label="Test",
+    )
+)
+
+print_monthly_backtest(
+    test_backtest,
+    label="Test",
+)
+
+walk_forward = (
+    run_walk_forward_validation(
+        data=training_data,
+        final_test_start="2024-03-26",
+        purge_horizon=252,
+        validation_days=126,
+        step_days=126,
+        min_train_days=756,
+    )
+)
+
+print_walk_forward_summary(
+    walk_forward
+)
+
+importance = (
+    calculate_feature_importance(
+        model=models.classifier,
+        X=split.X_validation,
+        y=split.y_top10_validation,
+    )
+)
+
+print_feature_importance(
+    importance
+)
+
+print_regime_summary(
+    panel,
+    start_date="2021-01-05",
+    end_date="2021-07-06",
+    label="Fold 3",
+)
+
+print_regime_summary(
+    panel,
+    start_date="2021-07-07",
+    end_date="2022-01-03",
+    label="Fold 4",
+)

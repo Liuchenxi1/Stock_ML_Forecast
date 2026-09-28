@@ -1,0 +1,22 @@
+Ticker,Error
+ATO,'Date'
+BR,'Date'
+CVX,'Date'
+COO,'Date'
+DG,'Date'
+ERIE,'Date'
+EXE,"HTTPSConnectionPool(host='www.sec.gov', port=443): Read timed out. (read timeout=30)"
+FLEX,'Date'
+HIG,'Date'
+IR,'Date'
+KIM,'Date'
+MRSH,'Date'
+MSI,'Date'
+ON,'Date'
+PLD,'Date'
+ROST,'Date'
+SMCI,'Date'
+TFC,'Date'
+UHS,"HTTPSConnectionPool(host='www.sec.gov', port=443): Read timed out."
+VMRK,'Date'
+ZBH,'Date'

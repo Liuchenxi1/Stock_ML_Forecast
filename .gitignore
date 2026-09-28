@@ -4,3 +4,4 @@
 
 # Ignore all downloaded/generated data
 data/
+experiments/
